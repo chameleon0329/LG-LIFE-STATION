@@ -3,9 +3,7 @@
     <div class="app-container">
       <!-- 프로모션 -->
       <div>
-        <router-link to="/">
           <p class="promotion">정기권 또는 주방 이용권 구매 시 장바구니 상품 10% 할인</p>
-        </router-link>
       </div>
 
       <!-- 메인 네비게이션 -->
@@ -58,9 +56,11 @@
           <p class="modal-description">
             {{ selectedItem.description || '상품 설명이 없습니다.' }}
           </p>
-          <div class="modal-image"></div>
+          <div class="modal-image">
+            <img :src="getImageUrl(selectedItem.url)" alt="상품 이미지" v-if="selectedItem.url" />
+          </div>
 
-          <div v-if="['한식', '양식', '중식', '세탁용품'].includes(selectedItem.type)" class="quantity-control">
+          <div v-if="['한식', '분식', '일식', '세탁용품'].includes(selectedItem.type)" class="quantity-control">
             <button @click="decreaseQuantity" :disabled="quantity === 1">-</button>
             <span class="quantity">{{ quantity }}</span>
             <button @click="increaseQuantity" :disabled="quantity >= 9">+</button> <!-- 최대 수량 9 -->
@@ -93,10 +93,19 @@ export default {
   setup() {
     const cartStore = useCartStore();
 
+    const getImageUrl = (url) => {
+      if (url.startsWith("@/assets")) {
+        // Webpack/Vite가 인식 가능한 경로로 변환
+        return new URL(`../${url.split("@/")[1]}`, import.meta.url).href;
+      }
+      return url; // 외부 URL은 그대로 반환
+    };
+
     return {
       cartCount: computed(() => cartStore.cartCount), // 총 수량 계산
       addToCart: cartStore.addTicketToCart, // 이용권 추가
       addProductToCart: cartStore.addProductToCart, // 상품 추가
+      getImageUrl,
     };
   },
   data() {
@@ -104,7 +113,7 @@ export default {
       currentMainTab: "ticket",
       currentSubTab: 0,
       ticketSubTabs: ["1회 이용권", "정기권 전용"],
-      productSubTabs: ["한식", "양식", "중식", "세탁용품"],
+      productSubTabs: ["한식", "분식", "일식", "세탁용품"],
       showModal: false,
       selectedItem: null,
       quantity: 1, // 초기 수량
@@ -161,7 +170,7 @@ export default {
         name: this.selectedItem.name,
         price: this.selectedItem.price,
         quantity: this.quantity,
-        image: this.selectedItem.image || null, // 이미지 선택적
+        url: this.selectedItem.url || null, // url 추가
       };
 
       if (this.currentMainTab === "ticket") {
@@ -253,7 +262,7 @@ body {
   padding: 10px 0;
   border-bottom: 1px solid #ddd;
   position: relative;
-  height: 57px;
+  /* height: 57px; */
   box-sizing: border-box;
 }
 
@@ -334,13 +343,23 @@ body {
   padding: 6px
 }
 .modal-image {
-  width: 172px;
-  height: 172px;
-  box-sizing: border-box;
-  border-radius: 8px;
-  background: #ddd;
-  margin: 0 auto;
-  margin-bottom: 16px;
+  width: 172px; /* Modal 이미지의 너비 */
+  height: 172px; /* Modal 이미지의 높이 */
+  border-radius: 8px; /* 둥근 모서리 설정 */
+  margin: 0 auto 16px; /* 중앙 정렬 및 아래쪽 여백 */
+  display: flex; /* 이미지 정렬을 위한 Flexbox 사용 */
+  align-items: center; /* 세로 중앙 정렬 */
+  justify-content: center; /* 가로 중앙 정렬 */
+  overflow: hidden; /* 이미지가 영역을 벗어나지 않도록 설정 */
+  background: #f4f4f4; /* 이미지가 로드되지 않을 경우 배경색 */
+}
+
+.modal-image img {
+  width: 100%; /* 이미지의 너비를 부모 요소에 맞춤 */
+  height: 100%; /* 이미지의 높이를 부모 요소에 맞춤 */
+  object-fit: cover; /* 부모 요소에 맞게 이미지를 잘라서 비율 유지 */
+  object-position: center; /* 이미지를 중앙에 위치 */
+  border-radius: 8px; /* 이미지도 모서리 둥글게 설정 */
 }
 .quantity-control {
   display: flex;

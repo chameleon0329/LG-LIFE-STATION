@@ -6,19 +6,19 @@
         <img src="@/assets/images/shopping-cart2.png" alt="" style="width: 30px; height: 30px; margin-right: 8px;" />
         장바구니
       </div>
-      <button @click="$router.push('/home')" class="close-btn">닫기</button>
+      <button @click="$router.push('/')" class="close-btn">닫기</button>
     </div>
 
     <!-- 장바구니 항목 -->
     <div class="cart-content">
       <p v-if="ticketItems.length === 0 && productItems.length === 0" class="empty-cart">장바구니에 담긴 상품이 없습니다.</p>
-      
+
       <!-- 이용권 리스트 -->
       <div v-if="ticketItems.length > 0" class="cart-section">
-        <h3 style="margin-top: 0px;">이용권</h3>
+        <h3 style="margin-top: 0;">이용권</h3>
         <div v-for="(item, index) in ticketItems" :key="item.id" class="cart-item">
           <div class="item-info">
-            <img :src="item.image || 'https://via.placeholder.com/50'" alt="" class="item-image" />
+            <img :src="getImageUrl(item.url)" alt="" class="item-image" />
             <div>
               <p class="item-name">{{ item.name }}</p>
               <p class="item-quantity">수량: {{ item.quantity }}</p>
@@ -33,10 +33,10 @@
 
       <!-- 상품 리스트 -->
       <div v-if="productItems.length > 0" class="cart-section">
-        <h3>상품</h3>
+        <h3 style="margin-top: 0;">상품</h3>
         <div v-for="(item, index) in productItems" :key="item.id" class="cart-item">
           <div class="item-info">
-            <img :src="item.image || 'https://via.placeholder.com/50'" alt="" class="item-image" />
+            <img :src="getImageUrl(item.url)" alt="" class="item-image" />
             <div>
               <p class="item-name">{{ item.name }}</p>
               <p class="item-quantity">수량: {{ item.quantity }}</p>
@@ -50,6 +50,7 @@
       </div>
     </div>
 
+    <!-- 결제 정보 -->
     <div class="payment-information">
       <div class="cart-summary">
         <div class="summary-row">
@@ -93,9 +94,26 @@ export default {
       cartStore.setExpirationTime(); // 만료 시간 설정
       router.push({ path: '/paymentcomplete' }); // PaymentCompleteView로 이동
     };
+
+    const getImageUrl = (url) => {
+      if (!url) {
+        return "https://via.placeholder.com/50"; // 기본 이미지 URL
+      }
+      if (url.startsWith("@/assets")) {
+        try {
+          // Webpack 또는 Vite의 자산 경로를 변환
+          return new URL(`../${url.split("@/")[1]}`, import.meta.url).href;
+        } catch (error) {
+          console.error("이미지 URL 변환 오류:", error);
+          return "https://via.placeholder.com/50"; // 오류 시 기본 이미지 반환
+        }
+      }
+      return url; // 외부 URL은 그대로 반환
+    };
     
     return {
       handlePayment,
+      getImageUrl,
       ticketItems: cartStore.ticketItems,
       productItems: cartStore.productItems,
       totalProductAmount: computed(() => cartStore.totalProductAmount),
@@ -160,6 +178,9 @@ export default {
   align-items: center;
   color: #999;
   font-size: 14px;
+}
+.cart-section{
+  margin-bottom: 16px;
 }
 .cart-section h3 {
   font-size: 16px;

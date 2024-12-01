@@ -6,7 +6,7 @@
       class="ticket"
       @click="$emit('open-popup', item)"
     >
-      <div class="ticket-image"></div>
+      <img :src="getImageUrl(item.url)" alt="상품 이미지" v-if="item.url" />
       <p class="ticket-name">{{ item.name }}</p>
       <p class="ticket-price">{{ item.price.toLocaleString() }}원</p>
     </div>
@@ -20,9 +20,18 @@ export default {
   name: "ContentSeason",
   setup() {
     const store = useTicketStore();
+
+    const getImageUrl = (url) => {
+      if (url.startsWith("@/assets")) {
+        // Webpack/Vite가 인식 가능한 경로로 변환
+        return new URL(`../${url.split("@/")[1]}`, import.meta.url).href;
+      }
+      return url; // 외부 URL은 그대로 반환
+    };
     
     return {
       seasons: store.seasons, // 정기권 데이터 가져오기
+      getImageUrl,
     };
   },
 };

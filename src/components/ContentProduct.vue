@@ -6,7 +6,9 @@
         class="product"
         @click="$emit('open-popup', item)"
       >
-        <div class="product-image"></div>
+        <div class="product-image">
+          <img :src="item.url" alt="상품 이미지" v-if="item.url" />
+        </div>
         <p class="product-name">{{ item.name }}</p>
         <p class="product-price">{{ item.price.toLocaleString() }}원</p>
       </div>
@@ -64,9 +66,16 @@
   }
   .product-image {
     height: 102px;
-    background: #ddd;
+    background: white;
     margin-bottom: 5px;
     border-radius: 5px;
+  }
+  .product-image img {
+    width: 100%; /* 이미지의 너비를 부모 요소에 맞춤 */
+    height: 100%; /* 이미지의 높이를 부모 요소에 맞춤 */
+    object-fit: cover; /* 부모 요소에 맞게 이미지를 잘라서 비율 유지 */
+    object-position: center; /* 이미지를 중앙에 위치 */
+    border-radius: 8px; /* 이미지도 모서리 둥글게 설정 */
   }
   .product-name {
     display: flex;

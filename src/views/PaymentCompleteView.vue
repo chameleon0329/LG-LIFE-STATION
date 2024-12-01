@@ -52,7 +52,7 @@ export default {
 
     const handleConfirm = () => {
       cartStore.resetCart(); // 장바구니 데이터 초기화
-      router.push({ path: '/home' }); // HomeView로 이동
+      router.push({ path: '/' }); // HomeView로 이동
     };
 
     return {
