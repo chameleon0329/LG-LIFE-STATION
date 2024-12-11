@@ -25,7 +25,7 @@
   
 <script>
 import { useRouter } from 'vue-router';
-import { useCartStore } from '@/store/cartStore';
+import { useCartStore } from '@/store/CartStore';
 import { computed } from "vue";
 
 export default {

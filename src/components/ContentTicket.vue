@@ -16,24 +16,37 @@
 </template>
 
 <script>
-import { useTicketStore } from "@/store/ticketStore";
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
+import { useLaundryTicketStore } from "../store/LaundryTicketStore";
 
 export default {
   name: "ContentTicket",
   setup() {
-    const store = useTicketStore();
+    const laundryTicketStore = useLaundryTicketStore();
 
-    // Combine kitchen and tickets
-    const allTickets = computed(() => [...store.kitchen, ...store.tickets]);
+    // 세탁권 데이터 매핑
+    const allTickets = computed(() =>
+      laundryTicketStore.laundryTickets.map((ticket) => ({
+        id: ticket.laundryTicketId,
+        name: ticket.laundryTicketName, // 세탁권 이름
+        price: ticket.laundryTicketPrice, // 세탁권 가격
+        description: ticket.laundryTicketClassification || "설명이 없습니다.", // 기본 설명
+        url: ticket.laundryTicketUrl || "@/assets/images/default-ticket.png", // 기본 이미지 사용
+      }))
+    );
 
+    // 이미지 URL 변환 함수
     const getImageUrl = (url) => {
       if (url.startsWith("@/assets")) {
-        // Webpack/Vite가 인식 가능한 경로로 변환
         return new URL(`../${url.split("@/")[1]}`, import.meta.url).href;
       }
-      return url; // 외부 URL은 그대로 반환
+      return url;
     };
+
+    // 세탁권 데이터 가져오기
+    onMounted(async () => {
+      await laundryTicketStore.fetchLaundryTickets();
+    });
 
     return {
       allTickets,
@@ -67,7 +80,9 @@ export default {
 .ticket:active {
   transform: scale(1.05);
 }
-.ticket-image {
+.ticket-image img {
+  max-width: 100%;
+  max-height: 100%;
   height: 102px;
   background: #ddd;
   margin-bottom: 5px;

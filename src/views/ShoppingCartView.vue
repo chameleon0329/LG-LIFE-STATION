@@ -1,79 +1,72 @@
 <template>
   <div class="app-container">
-    <!-- 장바구니 헤더 -->
     <div class="cart-header">
       <div style="display: flex; align-items: center; color: #FFF7EF;">
-        <img src="@/assets/images/shopping-cart2.png" alt="" style="width: 30px; height: 30px; margin-right: 8px;" />
+        <img src="@/assets/images/shopping-cart2.png" alt="cart" style="width: 30px; height: 30px; margin-right: 8px;" />
         장바구니
       </div>
       <button @click="$router.push('/')" class="close-btn">닫기</button>
     </div>
 
-    <!-- 장바구니 항목 -->
     <div class="cart-content">
-      <p v-if="ticketItems.length === 0 && productItems.length === 0" class="empty-cart">장바구니에 담긴 상품이 없습니다.</p>
+      <p v-if="cartStore.cartCount === 0" class="empty-cart">장바구니에 담긴 상품이 없습니다.</p>
 
-      <!-- 이용권 리스트 -->
-      <div v-if="ticketItems.length > 0" class="cart-section">
-        <h3 style="margin-top: 0;">이용권</h3>
-        <div v-for="(item, index) in ticketItems" :key="item.id" class="cart-item">
+      <div v-if="cartStore.ticketItems.length > 0" class="cart-section">
+        <h3>이용권</h3>
+        <div v-for="item in cartStore.ticketItems" :key="item.id" class="cart-item">
           <div class="item-info">
-            <img :src="getImageUrl(item.url)" alt="" class="item-image" />
+            <img :src="getImageUrl(item.url)" alt="ticket" class="item-image" />
             <div>
               <p class="item-name">{{ item.name }}</p>
               <p class="item-quantity">수량: {{ item.quantity }}</p>
             </div>
           </div>
           <div class="item-sub-info">
-            <button class="remove-item" @click="removeTicketFromCart(item.id)">X</button>
+            <button @click="cartStore.removeTicketFromCart(item.id)">X</button>
             <p class="item-price">{{ (item.price * item.quantity).toLocaleString() }}원</p>
           </div>
         </div>
       </div>
 
-      <!-- 상품 리스트 -->
-      <div v-if="productItems.length > 0" class="cart-section">
-        <h3 style="margin-top: 0;">상품</h3>
-        <div v-for="(item, index) in productItems" :key="item.id" class="cart-item">
+      <div v-if="cartStore.productItems.length > 0" class="cart-section">
+        <h3>상품</h3>
+        <div v-for="item in cartStore.productItems" :key="item.id" class="cart-item">
           <div class="item-info">
-            <img :src="getImageUrl(item.url)" alt="" class="item-image" />
+            <img :src="getImageUrl(item.url)" alt="product" class="item-image" />
             <div>
               <p class="item-name">{{ item.name }}</p>
               <p class="item-quantity">수량: {{ item.quantity }}</p>
             </div>
           </div>
           <div class="item-sub-info">
-            <button class="remove-item" @click="removeProductFromCart(item.id)">X</button>
+            <button @click="cartStore.removeProductFromCart(item.id)">X</button>
             <p class="item-price">{{ (item.price * item.quantity).toLocaleString() }}원</p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 결제 정보 -->
     <div class="payment-information">
       <div class="cart-summary">
         <div class="summary-row">
-          <span>총 금액 (주방 이용권 제외)</span>
-          <span>{{ totalProductAmount.toLocaleString() }}원</span>
+          <span>총 금액</span>
+          <span>{{ cartStore.totalProductAmount.toLocaleString() }}원</span>
         </div>
         <div class="discount-row">
-          <span style="padding-left: 10px;">└ 정기권 / 주방 이용 할인 (10%)</span>
-          <span style="font-weight: bold;">－{{ discountAmount.toLocaleString() }}원</span>
+          <span>할인 금액</span>
+          <span>－{{ cartStore.discountAmount.toLocaleString() }}원</span>
         </div>
         <div class="ticket-row">
-          <span>주방 이용권 금액</span>
-          <span>{{ ticketAmount.toLocaleString() }}원</span>
+          <span>이용권 금액</span>
+          <span>{{ cartStore.ticketAmount.toLocaleString() }}원</span>
         </div>
       </div>
       <div class="payment">
         <div class="summary-total">
-          <span>총 {{ totalQuantity }}건 결제금액</span>
-          <span>{{ paymentAmount.toLocaleString() }}원</span>
+          <span>총 결제금액</span>
+          <span>{{ cartStore.paymentAmount.toLocaleString() }}원</span>
         </div>
-        <router-link to="/paymentcomplete">
-          <button @click="handlePayment" class="checkout-button" :disabled="ticketItems.length === 0 && productItems.length === 0">결제하기</button>
-        </router-link>
+        <button @click="handlePayment" class="checkout-button" :disabled="cartStore.cartCount === 0">결제하기</button>
       </div>
     </div>
   </div>
@@ -81,7 +74,7 @@
 
 <script>
 import { computed } from "vue";
-import { useCartStore } from "@/store/cartStore";
+import { useCartStore } from "@/store/CartStore";
 import { useRouter } from "vue-router";
 
 export default {
@@ -90,9 +83,15 @@ export default {
     const cartStore = useCartStore();
     const router = useRouter();
 
-    const handlePayment = () => {
-      cartStore.setExpirationTime(); // 만료 시간 설정
-      router.push({ path: '/paymentcomplete' }); // PaymentCompleteView로 이동
+    const handlePayment = async () => {
+      try {
+        await cartStore.postOrder(); // 서버로 주문 데이터를 전송
+        cartStore.setExpirationTime(); // 만료 시간 설정
+        router.push({ path: '/paymentcomplete' }); // PaymentCompleteView로 이동
+      } catch (error) {
+        console.error("결제 중 오류 발생:", error);
+        alert("결제에 실패했습니다. 다시 시도해주세요.");
+      }
     };
 
     const getImageUrl = (url) => {
@@ -114,18 +113,8 @@ export default {
     return {
       handlePayment,
       getImageUrl,
-      ticketItems: cartStore.ticketItems,
-      productItems: cartStore.productItems,
-      totalProductAmount: computed(() => cartStore.totalProductAmount),
-      discountAmount: computed(() => cartStore.discountAmount),
-      ticketAmount: computed(() => cartStore.ticketAmount),
-      totalQuantity: computed(() => cartStore.totalQuantity),
-      paymentAmount: computed(() => cartStore.paymentAmount),
-      removeTicketFromCart: cartStore.removeTicketFromCart,
-      removeProductFromCart: cartStore.removeProductFromCart,
+      cartStore, // 전체 Store를 반환해 템플릿에서 사용
     };
-
-    
   },
 };
 </script>
