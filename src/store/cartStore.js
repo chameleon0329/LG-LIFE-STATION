@@ -1,4 +1,12 @@
 import { defineStore } from "pinia";
+import axios from "axios";
+
+const axiosInstance = axios.create({
+  // baseURL: 'http://localhost:8082', // localhost
+  // baseURL: 'http://10.0.2.2:8082', // 안드로이드
+  baseURL: 'http://192.168.0.89:8082',
+  timeout: 5000, // 요청 제한 시간 설정
+});
 
 export const useCartStore = defineStore("cartStore", {
   state: () => ({
@@ -57,8 +65,95 @@ export const useCartStore = defineStore("cartStore", {
       const uniqueProducts = state.productItems.length; // 상품의 고유한 항목 개수
       return uniqueTickets + uniqueProducts; // 총 고유 항목 개수 반환
     },
+
+    // Meal Kit ID와 수량
+    mealKitQuantities(state) {
+      return state.productItems.reduce((result, item) => {
+        if (item.category === "meal_kit") {
+          result[item.id] = item.quantity;
+        }
+        return result;
+      }, {});
+    },
+
+    // 세탁 용품 ID와 수량
+    laundrySuppliesQuantities(state) {
+      return state.productItems.reduce((result, item) => {
+        if (item.category === "laundry_supplies") {
+          result[item.id] = item.quantity;
+        }
+        return result;
+      }, {});
+    },
+    // 세탁권 ID와 사용 여부
+    laundryTicketUsage(state) {
+      return state.ticketItems.reduce((result, item) => {
+        result[item.id] = item.isUsed || false;
+        return result;
+      }, {});
+    },
+    // 가전 ID와 사용 여부
+    homeAppliancesUsage(state) {
+      return state.ticketItems.reduce((result, item) => {
+        result[item.id] = item.isUsed || false;
+        return result;
+      }, {});
+    },
+
+    // 데이터 변환
+    cartPayload(state) {
+      // 공간 이용 여부 (ID가 5인 항목이 있으면 true)
+      const spaceIsUsed = state.ticketItems.some(item => item.id === 5);
+    
+      // 세탁권 사용 여부
+      const laundryTicketUsage = state.ticketItems.reduce((map, item) => {
+        map[item.id] = item.category === 'laundry_ticket' && item.quantity > 0;
+        return map;
+      }, {});
+    
+      // 가전 사용 여부
+      const homeAppliancesUsage = state.ticketItems.reduce((map, item) => {
+        map[item.id] = item.category === 'home_appliance' && item.quantity > 0;
+        return map;
+      }, {});
+    
+      return {
+        userId: 3816344641, // 사용자 ID
+        storeId: 1, // 스토어 ID
+        spaceIsUsed, // 공간 사용 여부
+        totalPrice: state.totalProductAmount - state.discountAmount + state.ticketAmount, // 총 결제 금액
+        mealKitQuantities: state.productItems
+          .filter(item => item.category === "meal_kit")
+          .reduce((map, item) => {
+            map[item.id] = item.quantity;
+            return map;
+          }, {}),
+        laundrySuppliesQuantities: state.productItems
+          .filter(item => item.category === "laundry_supplies")
+          .reduce((map, item) => {
+            map[item.id] = item.quantity;
+            return map;
+          }, {}),
+        laundryTicketUsage,
+        homeAppliancesUsage,
+      };
+    },
+    
   },
   actions: {
+    async postOrder() {
+      try {
+        const payload = this.cartPayload;
+        console.log("서버로 전송할 payload:", payload); // 디버깅용 로그
+        const response = await axiosInstance.post("/shopCart/buy", payload);
+        console.log("주문 성공:", response.data);
+        this.resetCart(); // 성공 후 장바구니 초기화
+      } catch (error) {
+        console.error("주문 실패:", error.response?.data || error.message);
+      }
+    },
+    
+    
     // 장바구니에 이용권 추가 (동일한 이용권은 하나만 담기, 수량은 1로 고정)
     addTicketToCart(item) {
       const existingItem = this.ticketItems.find((i) => i.id === item.id);
@@ -76,12 +171,49 @@ export const useCartStore = defineStore("cartStore", {
 
     // 장바구니에 상품 추가
     addProductToCart(item) {
-      const existingItem = this.productItems.find((i) => i.id === item.id);
-      if (existingItem) {
-        existingItem.quantity += item.quantity;
-      } else {
-        this.productItems.push(item);
+      if (!item || !item.id) {
+        console.error("유효하지 않은 상품 데이터:", item);
+        return;
       }
+    
+      // classification 값에 따라 category 매핑
+      let category;
+      if (item.classification) {
+        if (["한식", "양식", "중식"].includes(item.classification)) {
+          category = "meal_kit";
+        } else if (["세제", "섬유유연제"].includes(item.classification)) {
+          category = "laundry_supplies";
+        } else {
+          category = "general"; // 기본값
+        }
+      } else {
+        category = "general"; // classification이 없으면 기본값
+      }
+    
+      // 동일한 상품이 이미 있는지 확인
+      const existingItem = this.productItems.find((i) => i.id === item.id);
+    
+      if (existingItem) {
+        // 수량 업데이트
+        existingItem.quantity += item.quantity || 1;
+        console.log(`기존 상품 업데이트됨: ${existingItem.name}, 새 수량: ${existingItem.quantity}`);
+      } else {
+        // 새로운 상품 추가
+        const newItem = {
+          id: item.id,
+          name: item.name || "이름 없음",
+          price: item.price || 0,
+          quantity: item.quantity || 1,
+          category, // 매핑된 category
+          url: item.url || "https://via.placeholder.com/150", // 기본 이미지 URL
+        };
+    
+        this.productItems.push(newItem);
+        console.log("새 상품 추가됨:", newItem);
+      }
+    
+      // 현재 상태 출력
+      console.log("현재 productItems 상태:", this.productItems);
     },
 
     // 장바구니에서 이용권 삭제

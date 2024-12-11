@@ -52,20 +52,31 @@
       <!-- Modal -->
       <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
         <div class="modal">
-          <h3 class="modal-title">{{ selectedItem.name }}</h3>
+          <h3 class="modal-title">
+            {{ selectedItem?.mealKitName || selectedItem?.laundrySuppliesName || selectedItem?.name || '상품 이름 없음' }}
+          </h3>
           <p class="modal-description">
-            {{ selectedItem.description || '상품 설명이 없습니다.' }}
+            {{ selectedItem?.mealKitDescription || selectedItem?.laundrySuppliesDescription || selectedItem?.description || '상품 설명이 없습니다.' }}
+          </p>
+          <!-- 재고 정보 -->
+          <p v-if="selectedItem?.mealKitCount !== undefined">
+            재고: {{ selectedItem.mealKitCount }}개
+          </p>
+          <p v-if="selectedItem?.laundrySuppliesCount !== undefined">
+            재고: {{ selectedItem.laundrySuppliesCount }}개
           </p>
           <div class="modal-image">
-            <img :src="getImageUrl(selectedItem.url)" alt="상품 이미지" v-if="selectedItem.url" />
+            <img 
+              :src="selectedItem?.mealKitUrl || selectedItem?.laundrySuppliesUrl || selectedItem?.url || ''" 
+              alt="상품 이미지" 
+              v-if="selectedItem?.mealKitUrl || selectedItem?.laundrySuppliesUrl || selectedItem?.url" 
+            />
           </div>
-
-          <div v-if="['한식', '분식', '일식', '세탁용품'].includes(selectedItem.type)" class="quantity-control">
+          <div v-if="selectedItem?.mealKitId || selectedItem?.laundrySuppliesId" class="quantity-control">
             <button @click="decreaseQuantity" :disabled="quantity === 1">-</button>
             <span class="quantity">{{ quantity }}</span>
-            <button @click="increaseQuantity" :disabled="quantity >= 9">+</button> <!-- 최대 수량 9 -->
+            <button @click="increaseQuantity" :disabled="quantity >= 9">+</button>
           </div>
-
           <div class="modal-actions">
             <button class="cancel-button" @click="closeModal">취소</button>
             <button class="add-to-cart-button" @click="addToCart">장바구니 담기</button>
@@ -78,10 +89,12 @@
 
 <script>
 import { computed } from "vue";
-import { useCartStore } from "@/store/cartStore";
+import { useCartStore } from "@/store/CartStore";
 import ContentProduct from "@/components/ContentProduct.vue";
 import ContentSeason from "@/components/ContentSeason.vue";
 import ContentTicket from "@/components/ContentTicket.vue";
+import { useMealKitStore } from "@/store/MealKitStore";
+import { useLaundrySuppliesStore } from "@/store/LaundrySuppliesStore";
 
 export default {
   name: "HomeView",
@@ -92,6 +105,8 @@ export default {
   },
   setup() {
     const cartStore = useCartStore();
+    const mealKitStore = useMealKitStore(); // mealKitStore 선언
+    const laundrySuppliesStore = useLaundrySuppliesStore(); // laundrySuppliesStore 선언
 
     const getImageUrl = (url) => {
       if (url.startsWith("@/assets")) {
@@ -106,6 +121,9 @@ export default {
       addToCart: cartStore.addTicketToCart, // 이용권 추가
       addProductToCart: cartStore.addProductToCart, // 상품 추가
       getImageUrl,
+      mealKitStore, // setup 반환에 추가
+      laundrySuppliesStore, // setup 반환에 추가
+      getImageUrl,
     };
   },
   data() {
@@ -113,7 +131,7 @@ export default {
       currentMainTab: "ticket",
       currentSubTab: 0,
       ticketSubTabs: ["1회 이용권", "정기권 전용"],
-      productSubTabs: ["한식", "분식", "일식", "세탁용품"],
+      productSubTabs: ["한식", "중식", "양식", '세탁용품'],
       showModal: false,
       selectedItem: null,
       quantity: 1, // 초기 수량
@@ -138,6 +156,10 @@ export default {
     },
   },
   methods: {
+    // Flutter에서 호출하는 함수
+    receiveStoreId(storeId) {
+      console.log("Received storeId:", storeId);
+    },
     switchMainTab(tab) {
       this.currentMainTab = tab;
       this.currentSubTab = 0;
@@ -145,10 +167,28 @@ export default {
     switchSubTab(index) {
       this.currentSubTab = index;
     },
-    openModal(item) {
-      this.selectedItem = item;
-      this.showModal = true;
-      this.quantity = 1;
+    async openModal(item) {
+      this.showModal = true; // 모달 열기
+      this.selectedItem = null; // 초기화
+      this.quantity = 1; // 초기 수량
+
+      try {
+        if (item.mealKitId) {
+          // 밀키트 상세 정보 가져오기
+          await this.mealKitStore.fetchMealKitDetail(item.mealKitId);
+          this.selectedItem = this.mealKitStore.mealKit; // 상세 데이터 저장
+        } else if (item.laundrySuppliesId) {
+          // 세탁용품 상세 정보 가져오기
+          await this.laundrySuppliesStore.fetchLaundrySuppliesDetail(item.laundrySuppliesId);
+          this.selectedItem = this.laundrySuppliesStore.laundrySupply; // 상세 데이터 저장
+        } else {
+          // 세탁권은 추가 통신 없이 처리
+          this.selectedItem = item;
+        }
+      } catch (error) {
+        console.error("Failed to fetch item detail:", error);
+        this.selectedItem = item; // 오류 발생 시 기본 데이터를 사용
+      }
     },
     closeModal() {
       this.showModal = false;
@@ -166,17 +206,18 @@ export default {
     },
     addToCart() {
       const itemToAdd = {
-        id: this.selectedItem.id, // 유니크 ID 필요
-        name: this.selectedItem.name,
-        price: this.selectedItem.price,
+        id: this.selectedItem.id || this.selectedItem.mealKitId || this.selectedItem.laundrySuppliesId,
+        name: this.selectedItem.name || this.selectedItem.mealKitName || this.selectedItem.laundrySuppliesName || this.selectedItem.laundryTicketName,
+        price: this.selectedItem.price || this.selectedItem.mealKitPrice || this.selectedItem.laundrySuppliesPrice || 0,
+        classification: this.selectedItem.mealKitClassification || this.selectedItem.laundrySuppliesClassification || null,
         quantity: this.quantity,
-        url: this.selectedItem.url || null, // url 추가
+        url: this.selectedItem.url || this.selectedItem.mealKitUrl || this.selectedItem.laundrySuppliesUrl || null,
       };
 
       if (this.currentMainTab === "ticket") {
-        this.addToCart(itemToAdd); // 이용권은 addTicketToCart로 추가
+        this.addToCart(itemToAdd);
       } else if (this.currentMainTab === "product") {
-        this.addProductToCart(itemToAdd); // 상품은 addProductToCart로 추가
+        this.addProductToCart(itemToAdd);
       }
 
       this.closeModal();

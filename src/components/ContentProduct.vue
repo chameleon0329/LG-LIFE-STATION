@@ -1,46 +1,84 @@
 <template>
-    <div class="content">
-      <div
-        v-for="(item, index) in filteredProducts"
-        :key="index"
-        class="product"
-        @click="$emit('open-popup', item)"
-      >
-        <div class="product-image">
-          <img :src="item.url" alt="상품 이미지" v-if="item.url" />
-        </div>
-        <p class="product-name">{{ item.name }}</p>
-        <p class="product-price">{{ item.price.toLocaleString() }}원</p>
+  <div class="content">
+    <!-- 상품 아이템 렌더링 -->
+    <div
+      v-for="(item, index) in filteredProducts"
+      :key="index"
+      class="product"
+      @click="$emit('open-popup', item)"
+    >
+      <div class="product-image">
+        <img :src="item.laundrySuppliesUrl || item.mealKitUrl" alt="상품 이미지" />
       </div>
+      <p class="product-name">
+        {{ item.laundrySuppliesName || item.mealKitName }}
+      </p>
+      <p class="product-price">
+        {{ (item.laundrySuppliesPrice || item.mealKitPrice).toLocaleString() }}원
+      </p>
     </div>
-  </template>
-  
-  <script>
-  import { computed } from "vue"; // computed를 vue로부터 가져옵니다.
-  import { useTicketStore } from "@/store/ticketStore";
-  
-  export default {
-    name: "ContentProduct",
-    props: {
-      type: {
-        type: String,
-        required: true,
-      },
+    <!-- 데이터가 없을 때 메시지 표시 -->
+    <p v-if="filteredProducts.length === 0" class="no-data">상품이 없습니다.</p>
+  </div>
+</template>  
+
+<script>
+import { useLaundrySuppliesStore } from "../store/LaundrySuppliesStore";
+import { useMealKitStore } from "../store/MealKitStore";
+import { onMounted, computed, watch } from "vue";
+
+export default {
+  name: "ContentProduct",
+  props: {
+    type: {
+      type: String,
+      required: true, 
     },
-    setup(props) {
-      const store = useTicketStore();
-  
-      // `type` 값이 변경될 때 필터링된 데이터를 제공
-      const filteredProducts = computed(() => store.filteredProducts(props.type));
-  
-      return {
-        filteredProducts,
-      };
-    },
-  };
-  </script>
-  
-  <style scoped>
+  },
+  setup(props) {
+    const mealKitStore = useMealKitStore();
+    const laundrySuppliesStore = useLaundrySuppliesStore();
+
+    const loadData = async () => {
+      if (props.type === "세탁용품") {
+        await laundrySuppliesStore.fetchLaundrySupplies();
+      } else {
+        await mealKitStore.fetchMealKits();
+      }
+    };
+
+    // `props.type` 변경 시 데이터 새로 로드
+    watch(() => props.type, async () => {
+      await loadData();
+    });
+
+    // 초기 데이터 로드
+    onMounted(loadData);
+
+    // 필터링된 상품 리스트 반환
+    const filteredProducts = computed(() => {
+      if (props.type === "세탁용품") {
+        // "세탁용품"인 경우 "세제"와 "섬유유연제" 모두 필터링
+        return laundrySuppliesStore.laundrySupplies.filter(
+          (item) =>
+            item.laundrySuppliesClassification === "세제" ||
+            item.laundrySuppliesClassification === "섬유유연제"
+        );
+      } else if (props.type === "한식" || props.type === "중식" || props.type === "양식") {
+        return mealKitStore.mealKits.filter(
+          (mealKit) => mealKit.mealKitClassification === props.type
+        );
+      }
+      return [];
+    });
+
+    return {
+      filteredProducts,
+    };
+  },
+};
+</script>
+<style scoped>
   .content {
     display: flex;
     flex-wrap: wrap;

@@ -1,12 +1,14 @@
 <template>
   <div class="content">
     <div
-      v-for="item in seasons"
+      v-for="item in allSeasons"
       :key="item.id"
       class="ticket"
       @click="$emit('open-popup', item)"
     >
-      <img :src="getImageUrl(item.url)" alt="상품 이미지" v-if="item.url" />
+      <div class="ticket-image">
+        <img :src="getImageUrl(item.url)" alt="상품 이미지" v-if="item.url" />
+      </div>
       <p class="ticket-name">{{ item.name }}</p>
       <p class="ticket-price">{{ item.price.toLocaleString() }}원</p>
     </div>
@@ -14,23 +16,40 @@
 </template>
 
 <script>
-import { useTicketStore } from "@/store/ticketStore";
+import { useLaundryTicketStore } from "../store/LaundryTicketStore";
+import { computed, onMounted } from "vue";
 
 export default {
   name: "ContentSeason",
   setup() {
-    const store = useTicketStore();
+    const laundryTicketStore = useLaundryTicketStore();
 
+    // 모든 시즌 데이터를 세탁권 데이터로만 구성
+    const allSeasons = computed(() =>
+      laundryTicketStore.laundryTickets.map((ticket) => ({
+        id: ticket.laundryTicketId,
+        name: ticket.laundryTicketName, // 세탁권 이름
+        description: ticket.laundryTicketClassification,
+        price: 0, // 세탁권 가격
+        url: ticket.laundryTicketUrl, // 기본 이미지
+      }))
+    );
+
+    // 이미지 URL 변환 함수
     const getImageUrl = (url) => {
       if (url.startsWith("@/assets")) {
-        // Webpack/Vite가 인식 가능한 경로로 변환
         return new URL(`../${url.split("@/")[1]}`, import.meta.url).href;
       }
-      return url; // 외부 URL은 그대로 반환
+      return url;
     };
-    
+
+    // 세탁권 데이터 가져오기
+    onMounted(async () => {
+      await laundryTicketStore.fetchLaundryTickets();
+    });
+
     return {
-      seasons: store.seasons, // 정기권 데이터 가져오기
+      allSeasons, // 세탁권 데이터 반환
       getImageUrl,
     };
   },
@@ -61,7 +80,9 @@ export default {
 .ticket:active {
   transform: scale(1.05);
 }
-.ticket-image {
+.ticket-image img {
+  max-width: 100%;
+  max-height: 100%;
   height: 102px;
   background: #ddd;
   margin-bottom: 5px;
